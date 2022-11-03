@@ -1,5 +1,7 @@
 package io.agora.syncmanagerexample;
 
+import static android.content.ContentValues.TAG;
+
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
@@ -14,14 +16,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import io.agora.syncmanager.rtm.SyncManagerException;
 import io.agora.syncmanager.rtm.IObject;
 import io.agora.syncmanager.rtm.Scene;
 import io.agora.syncmanager.rtm.SceneReference;
 import io.agora.syncmanager.rtm.Sync;
+import io.agora.syncmanager.rtm.SyncManagerException;
 import io.agora.syncmanagerexample.databinding.ActivityRoomBinding;
-
-import static android.content.ContentValues.TAG;
 
 public class RoomActivity extends AppCompatActivity implements CompoundButton.OnCheckedChangeListener {
 
@@ -30,6 +30,7 @@ public class RoomActivity extends AppCompatActivity implements CompoundButton.On
     private Handler handler = new Handler(Looper.getMainLooper());
     private String channel;
     private String userid;
+    private String userObjectId;
     private Boolean isGridLayout;
     private SceneReference sceneRef;
     private static final String MEMBER = "member";
@@ -115,6 +116,7 @@ public class RoomActivity extends AppCompatActivity implements CompoundButton.On
                 @Override
                 public void onSuccess(IObject result) {
                     Log.i(TAG, "on add member Success: " + result.getId());
+                    userObjectId = result.getId();
                 }
 
                 @Override
@@ -127,6 +129,12 @@ public class RoomActivity extends AppCompatActivity implements CompoundButton.On
                 @Override
                 public void onSuccess(List<IObject> result) {
                     Log.i(TAG, "on get member list Success: " + result.size());
+                    runOnUiThread(() -> {
+                        for (IObject iObject : result) {
+                            Member item = new Member(iObject.getId(), iObject.toString());
+                            mAdapter.add(item);
+                        }
+                    });
                 }
 
                 @Override
@@ -147,7 +155,7 @@ public class RoomActivity extends AppCompatActivity implements CompoundButton.On
         if(sceneRef == null){
             return;
         }
-        sceneRef.collection(MEMBER).delete(userid, new Sync.Callback() {
+        sceneRef.collection(MEMBER).delete(userObjectId, new Sync.Callback() {
             @Override
             public void onSuccess() {
                 Log.i(TAG, "on delete member Success");
@@ -193,6 +201,13 @@ public class RoomActivity extends AppCompatActivity implements CompoundButton.On
         @Override
         public void onUpdated(IObject item) {
             Log.i(TAG, "on member updated: " + item.getId());
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    Member member = new Member(item.getId(), item.toString());
+                    mAdapter.add(member);
+                }
+            });
         }
 
         @Override
@@ -248,7 +263,7 @@ public class RoomActivity extends AppCompatActivity implements CompoundButton.On
         @Override
         public void onUpdated(IObject item) {
             Log.i(TAG, "on room property Created: " + item.getId());
-            if (item.getId().equals("layout")) {
+            if (item.getId().contains("layout")) {
                 isGridLayout = item.toObject(String.class).equals("grid");
                 handler.post(() -> mBinding.switchLayout.setChecked(isGridLayout));
             }
